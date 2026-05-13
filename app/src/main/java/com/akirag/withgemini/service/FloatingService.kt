@@ -15,6 +15,7 @@ import android.widget.Toast
 import com.akirag.withgemini.R
 import com.akirag.withgemini.apppicker.AppPickerActivity
 import com.akirag.withgemini.utils.Prefs
+import com.akirag.withgemini.overlay.TimerOverlay
 import kotlin.math.abs
 
 class FloatingService : Service() {
@@ -22,6 +23,9 @@ class FloatingService : Service() {
     private lateinit var windowManager: WindowManager
     private lateinit var floatingView: View
     private lateinit var params: WindowManager.LayoutParams
+    
+    // Naya Engine Yahan Init hoga
+    private lateinit var timerOverlay: TimerOverlay
 
     private var isMenuExpanded = false
 
@@ -35,6 +39,8 @@ class FloatingService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        
+        timerOverlay = TimerOverlay(this) // Timer Engine load ho gaya
         
         floatingView = LayoutInflater.from(this).inflate(R.layout.layout_floating_button, null)
         
@@ -69,16 +75,14 @@ class FloatingService : Service() {
         setupMenuClicks()
     }
 
-    // Har baar jab menu khulega, ye check karega ki koi app save hui hai ya nahi
     private fun updateAddButtonIcon() {
         val savedPackage = Prefs.getSavedAppPackage(this)
         if (savedPackage != null) {
             try {
                 val icon = packageManager.getApplicationIcon(savedPackage)
                 btnAdd.background = icon
-                btnAdd.text = "" // Text hata do taake sirf app ka icon dikhe
+                btnAdd.text = "" 
             } catch (e: Exception) {
-                // Agar app uninstall ho gayi toh wapas normal ho jao
                 btnAdd.setBackgroundResource(R.drawable.mini_circle_background)
                 btnAdd.text = "+"
             }
@@ -139,7 +143,7 @@ class FloatingService : Service() {
             
             btnMain.text = "G"
         } else {
-            updateAddButtonIcon() // Menu khulne se pehle icon update karo
+            updateAddButtonIcon() 
             
             btnGemini.visibility = View.VISIBLE
             btnAdd.visibility = View.VISIBLE
@@ -162,7 +166,6 @@ class FloatingService : Service() {
             launchGeminiApp()
         }
         
-        // Short Click: App Launch karo ya Picker kholo
         btnAdd.setOnClickListener {
             toggleRadialMenu()
             val savedPackage = Prefs.getSavedAppPackage(this)
@@ -173,7 +176,6 @@ class FloatingService : Service() {
             }
         }
 
-        // Long Click: Hamesha App Picker kholo change karne ke liye
         btnAdd.setOnLongClickListener {
             toggleRadialMenu()
             openAppPicker()
@@ -184,9 +186,11 @@ class FloatingService : Service() {
             toggleRadialMenu()
             Toast.makeText(this, "Settings screen aayegi (Phase 6)", Toast.LENGTH_SHORT).show()
         }
+        
+        // Yahan par humne Timer Engine ko jodh diya!
         btnClock.setOnClickListener {
             toggleRadialMenu()
-            Toast.makeText(this, "Timer engine aayega (Phase 4)", Toast.LENGTH_SHORT).show()
+            timerOverlay.show()
         }
     }
 
@@ -194,7 +198,6 @@ class FloatingService : Service() {
         val intent = Intent(this, AppPickerActivity::class.java)
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         startActivity(intent)
-        Toast.makeText(this, "Select App for Shortcut", Toast.LENGTH_SHORT).show()
     }
 
     private fun launchSavedApp(packageName: String) {
@@ -217,8 +220,6 @@ class FloatingService : Service() {
             if (intent != null) {
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 startActivity(intent)
-            } else {
-                Toast.makeText(this, "Gemini app install nahi hai bhai!", Toast.LENGTH_LONG).show()
             }
         } catch (e: Exception) {
             Toast.makeText(this, "Error opening Gemini", Toast.LENGTH_SHORT).show()
