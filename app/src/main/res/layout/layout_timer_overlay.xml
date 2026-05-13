@@ -22,7 +22,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:gravity="space_evenly">
+        android:gravity="center"
+        android:weightSum="3">
 
         <TextView
             android:id="@+id/btn_play"
@@ -33,7 +34,8 @@
             android:background="#39FF14"
             android:gravity="center"
             android:textSize="18sp"
-            android:textStyle="bold"/>
+            android:textStyle="bold"
+            android:layout_weight="1"/>
 
         <TextView
             android:id="@+id/btn_pause"
@@ -44,7 +46,8 @@
             android:background="#222222"
             android:gravity="center"
             android:textSize="18sp"
-            android:textStyle="bold"/>
+            android:textStyle="bold"
+            android:layout_weight="1"/>
 
         <TextView
             android:id="@+id/btn_close"
@@ -55,6 +58,7 @@
             android:background="#222222"
             android:gravity="center"
             android:textSize="18sp"
-            android:textStyle="bold"/>
+            android:textStyle="bold"
+            android:layout_weight="1"/>
     </LinearLayout>
 </LinearLayout>
