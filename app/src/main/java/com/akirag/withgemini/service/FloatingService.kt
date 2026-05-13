@@ -34,7 +34,8 @@ class FloatingService : Service() {
     
     private lateinit var timerOverlay: TimerOverlay
     private var isMenuExpanded = false
-    private var isNotifActive = false // Naya check taake notification aur battery aapas mein na ladein
+    private var isNotifActive = false 
+    private var isLowBattery = false
 
     private lateinit var btnMain: TextView
     private lateinit var btnGemini: TextView
@@ -42,40 +43,45 @@ class FloatingService : Service() {
     private lateinit var btnSettings: TextView
     private lateinit var btnClock: TextView
 
-    // Notification Receiver
-    private val notificationReceiver = object : BroadcastReceiver() {
+    // Signals pakadne wala receiver
+    private val appReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            if (Prefs.isNotifLightEnabled(this@FloatingService)) {
-                when (intent?.action) {
-                    "AKIRA_NOTIF_POSTED" -> {
+            when (intent?.action) {
+                // Settings se Instant Color Change Signal
+                "AKIRA_UPDATE_COLOR" -> {
+                    if (!isNotifActive && !isLowBattery) {
+                        setNeonColor(Prefs.getDefaultColor(this@FloatingService))
+                    }
+                }
+                "AKIRA_NOTIF_POSTED" -> {
+                    if (Prefs.isNotifLightEnabled(this@FloatingService)) {
                         isNotifActive = true
                         setNeonColor("#FF3131") 
                     }
-                    "AKIRA_NOTIF_CLEARED" -> {
+                }
+                "AKIRA_NOTIF_CLEARED" -> {
+                    if (Prefs.isNotifLightEnabled(this@FloatingService)) {
                         isNotifActive = false
-                        setNeonColor("#39FF14") // Default Green
+                        applyBaseColor() 
                     }
                 }
-            }
-        }
-    }
-
-    // NAYA BATTERY AUR CHARGER RECEIVER 🔋⚡
-    private val batteryReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            when (intent?.action) {
                 Intent.ACTION_BATTERY_CHANGED -> {
-                    // Agar notification aayi hui hai, toh battery color change mat karo
-                    if (!isNotifActive && Prefs.isBatteryColorEnabled(this@FloatingService)) {
+                    if (Prefs.isBatteryColorEnabled(this@FloatingService)) {
                         val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
                         val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
                         val batteryPct = level * 100 / scale.toFloat()
                         
-                        when {
-                            batteryPct >= 80 -> setNeonColor("#39FF14") // Green
-                            batteryPct >= 40 -> setNeonColor("#FFFF00") // Yellow
-                            else -> setNeonColor("#FF3131") // Red
+                        isLowBattery = batteryPct < 80
+                        
+                        if (!isNotifActive) {
+                            when {
+                                batteryPct >= 80 -> setNeonColor(Prefs.getDefaultColor(this@FloatingService)) // Full battery pe user ka chosen color
+                                batteryPct >= 40 -> setNeonColor("#FFFF00") // Yellow
+                                else -> setNeonColor("#FF3131") // Red
+                            }
                         }
+                    } else {
+                        isLowBattery = false
                     }
                 }
                 Intent.ACTION_POWER_CONNECTED -> {
@@ -98,17 +104,14 @@ class FloatingService : Service() {
     override fun onCreate() {
         super.onCreate()
         
-        // Notifications aur Battery dono ke signals catch karna
-        val notifFilter = IntentFilter()
-        notifFilter.addAction("AKIRA_NOTIF_POSTED")
-        notifFilter.addAction("AKIRA_NOTIF_CLEARED")
-        registerReceiver(notificationReceiver, notifFilter, RECEIVER_NOT_EXPORTED)
-
-        val batteryFilter = IntentFilter()
-        batteryFilter.addAction(Intent.ACTION_BATTERY_CHANGED)
-        batteryFilter.addAction(Intent.ACTION_POWER_CONNECTED)
-        batteryFilter.addAction(Intent.ACTION_POWER_DISCONNECTED)
-        registerReceiver(batteryReceiver, batteryFilter)
+        val filter = IntentFilter()
+        filter.addAction("AKIRA_UPDATE_COLOR")
+        filter.addAction("AKIRA_NOTIF_POSTED")
+        filter.addAction("AKIRA_NOTIF_CLEARED")
+        filter.addAction(Intent.ACTION_BATTERY_CHANGED)
+        filter.addAction(Intent.ACTION_POWER_CONNECTED)
+        filter.addAction(Intent.ACTION_POWER_DISCONNECTED)
+        registerReceiver(appReceiver, filter, RECEIVER_NOT_EXPORTED)
 
         timerOverlay = TimerOverlay(this) 
         floatingView = LayoutInflater.from(this).inflate(R.layout.layout_floating_button, null)
@@ -140,8 +143,17 @@ class FloatingService : Service() {
         btnSettings = floatingView.findViewById(R.id.btn_settings)
         btnClock = floatingView.findViewById(R.id.btn_clock)
 
+        // Shuru mein user ka chuna hua color lagao
+        applyBaseColor()
+
         setupDraggingAndClick()
         setupMenuClicks()
+    }
+
+    private fun applyBaseColor() {
+        if (!isLowBattery) {
+            setNeonColor(Prefs.getDefaultColor(this))
+        }
     }
 
     private fun setNeonColor(hexColor: String) {
@@ -305,9 +317,7 @@ class FloatingService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
-        // App band hone par dono receivers ko safely kill karna
-        unregisterReceiver(notificationReceiver)
-        unregisterReceiver(batteryReceiver)
+        unregisterReceiver(appReceiver)
         if (::floatingView.isInitialized) {
             windowManager.removeView(floatingView)
         }
