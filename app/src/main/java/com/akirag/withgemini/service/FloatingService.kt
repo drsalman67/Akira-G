@@ -1,8 +1,13 @@
 package com.akirag.withgemini.service
 
 import android.app.Service
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.graphics.Color
 import android.graphics.PixelFormat
+import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.IBinder
 import android.view.Gravity
@@ -24,7 +29,6 @@ class FloatingService : Service() {
     private lateinit var floatingView: View
     private lateinit var params: WindowManager.LayoutParams
     
-    // Naya Engine Yahan Init hoga
     private lateinit var timerOverlay: TimerOverlay
 
     private var isMenuExpanded = false
@@ -35,12 +39,28 @@ class FloatingService : Service() {
     private lateinit var btnSettings: TextView
     private lateinit var btnClock: TextView
 
+    // Naya Signal Receiver!
+    private val notificationReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            when (intent?.action) {
+                [span_5](start_span)"AKIRA_NOTIF_POSTED" -> setNeonColor("#FF3131") // Notification aane par RED[span_5](end_span)
+                "AKIRA_NOTIF_CLEARED" -> setNeonColor("#39FF14") // Clear hone par wapas GREEN
+            }
+        }
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
         
-        timerOverlay = TimerOverlay(this) // Timer Engine load ho gaya
+        // Receiver Register karna
+        val filter = IntentFilter()
+        filter.addAction("AKIRA_NOTIF_POSTED")
+        filter.addAction("AKIRA_NOTIF_CLEARED")
+        registerReceiver(notificationReceiver, filter)
+
+        timerOverlay = TimerOverlay(this) 
         
         floatingView = LayoutInflater.from(this).inflate(R.layout.layout_floating_button, null)
         
@@ -73,6 +93,16 @@ class FloatingService : Service() {
 
         setupDraggingAndClick()
         setupMenuClicks()
+    }
+
+    // Dynamic Color Changer Logic
+    private fun setNeonColor(hexColor: String) {
+        val drawable = GradientDrawable()
+        drawable.shape = GradientDrawable.OVAL
+        drawable.setColor(Color.parseColor(hexColor))
+        drawable.setStroke(4, Color.WHITE) // Border thickness
+        btnMain.background = drawable
+        btnMain.setTextColor(Color.BLACK)
     }
 
     private fun updateAddButtonIcon() {
@@ -187,7 +217,6 @@ class FloatingService : Service() {
             Toast.makeText(this, "Settings screen aayegi (Phase 6)", Toast.LENGTH_SHORT).show()
         }
         
-        // Yahan par humne Timer Engine ko jodh diya!
         btnClock.setOnClickListener {
             toggleRadialMenu()
             timerOverlay.show()
@@ -228,6 +257,7 @@ class FloatingService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        unregisterReceiver(notificationReceiver)
         if (::floatingView.isInitialized) {
             windowManager.removeView(floatingView)
         }

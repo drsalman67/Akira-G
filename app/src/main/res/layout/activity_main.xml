@@ -4,7 +4,8 @@
     android:layout_height="match_parent"
     android:gravity="center"
     android:orientation="vertical"
-    android:background="#121212">
+    android:background="#121212"
+    android:padding="20dp">
 
     <TextView
         android:layout_width="wrap_content"
@@ -13,14 +14,24 @@
         android:textColor="#39FF14"
         android:textSize="24sp"
         android:textStyle="bold"
-        android:layout_marginBottom="30dp"/>
+        android:layout_marginBottom="40dp"/>
 
     <Button
         android:id="@+id/btnStartService"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Start Floating Service"
+        android:text="1. Start Floating Service"
         android:backgroundTint="#39FF14"
         android:textColor="#000000"
+        android:textStyle="bold"
+        android:layout_marginBottom="20dp"/>
+
+    <Button
+        android:id="@+id/btnNotificationPermission"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="2. Enable Notification Blink (Required)"
+        android:backgroundTint="#FF3131"
+        android:textColor="#FFFFFF"
         android:textStyle="bold"/>
 </LinearLayout>
