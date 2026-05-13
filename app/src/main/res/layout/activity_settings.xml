@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#121212"
+    android:padding="24dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Akira-G Settings"
+        android:textColor="#39FF14"
+        android:textSize="26sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:layout_marginBottom="32dp"/>
+
+    <Switch
+        android:id="@+id/switch_battery_color"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Adaptive Battery Color"
+        android:textColor="#FFFFFF"
+        android:textSize="18sp"
+        android:padding="12dp"
+        android:theme="@style/Theme.AppCompat.DayNight"/>
+
+    <Switch
+        android:id="@+id/switch_notif_light"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Notification Lighting (Red)"
+        android:textColor="#FFFFFF"
+        android:textSize="18sp"
+        android:padding="12dp"
+        android:theme="@style/Theme.AppCompat.DayNight"/>
+
+    <Switch
+        android:id="@+id/switch_charge_anim"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Charging Animation"
+        android:textColor="#FFFFFF"
+        android:textSize="18sp"
+        android:padding="12dp"
+        android:theme="@style/Theme.AppCompat.DayNight"/>
+
+</LinearLayout>

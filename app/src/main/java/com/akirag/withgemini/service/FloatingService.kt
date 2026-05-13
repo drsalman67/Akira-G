@@ -8,6 +8,7 @@ import android.content.IntentFilter
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
+import android.os.BatteryManager
 import android.os.Build
 import android.os.IBinder
 import android.view.Gravity
@@ -15,9 +16,11 @@ import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.view.animation.AnimationUtils
 import android.widget.TextView
 import android.widget.Toast
 import com.akirag.withgemini.R
+import com.akirag.withgemini.SettingsActivity
 import com.akirag.withgemini.apppicker.AppPickerActivity
 import com.akirag.withgemini.utils.Prefs
 import com.akirag.withgemini.overlay.TimerOverlay
@@ -30,8 +33,8 @@ class FloatingService : Service() {
     private lateinit var params: WindowManager.LayoutParams
     
     private lateinit var timerOverlay: TimerOverlay
-
     private var isMenuExpanded = false
+    private var isNotifActive = false // Naya check taake notification aur battery aapas mein na ladein
 
     private lateinit var btnMain: TextView
     private lateinit var btnGemini: TextView
@@ -39,12 +42,53 @@ class FloatingService : Service() {
     private lateinit var btnSettings: TextView
     private lateinit var btnClock: TextView
 
-    // Naya Signal Receiver!
+    // Notification Receiver
     private val notificationReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
+            if (Prefs.isNotifLightEnabled(this@FloatingService)) {
+                when (intent?.action) {
+                    "AKIRA_NOTIF_POSTED" -> {
+                        isNotifActive = true
+                        setNeonColor("#FF3131") 
+                    }
+                    "AKIRA_NOTIF_CLEARED" -> {
+                        isNotifActive = false
+                        setNeonColor("#39FF14") // Default Green
+                    }
+                }
+            }
+        }
+    }
+
+    // NAYA BATTERY AUR CHARGER RECEIVER 🔋⚡
+    private val batteryReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
-                [span_5](start_span)"AKIRA_NOTIF_POSTED" -> setNeonColor("#FF3131") // Notification aane par RED[span_5](end_span)
-                "AKIRA_NOTIF_CLEARED" -> setNeonColor("#39FF14") // Clear hone par wapas GREEN
+                Intent.ACTION_BATTERY_CHANGED -> {
+                    // Agar notification aayi hui hai, toh battery color change mat karo
+                    if (!isNotifActive && Prefs.isBatteryColorEnabled(this@FloatingService)) {
+                        val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+                        val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+                        val batteryPct = level * 100 / scale.toFloat()
+                        
+                        when {
+                            batteryPct >= 80 -> setNeonColor("#39FF14") // Green
+                            batteryPct >= 40 -> setNeonColor("#FFFF00") // Yellow
+                            else -> setNeonColor("#FF3131") // Red
+                        }
+                    }
+                }
+                Intent.ACTION_POWER_CONNECTED -> {
+                    if (Prefs.isChargeAnimEnabled(this@FloatingService)) {
+                        btnMain.text = "⚡"
+                        val rotateAnim = AnimationUtils.loadAnimation(this@FloatingService, R.anim.rotate_charging)
+                        btnMain.startAnimation(rotateAnim)
+                    }
+                }
+                Intent.ACTION_POWER_DISCONNECTED -> {
+                    btnMain.clearAnimation()
+                    if (!isMenuExpanded) btnMain.text = "G"
+                }
             }
         }
     }
@@ -54,14 +98,19 @@ class FloatingService : Service() {
     override fun onCreate() {
         super.onCreate()
         
-        // Receiver Register karna
-        val filter = IntentFilter()
-        filter.addAction("AKIRA_NOTIF_POSTED")
-        filter.addAction("AKIRA_NOTIF_CLEARED")
-        registerReceiver(notificationReceiver, filter)
+        // Notifications aur Battery dono ke signals catch karna
+        val notifFilter = IntentFilter()
+        notifFilter.addAction("AKIRA_NOTIF_POSTED")
+        notifFilter.addAction("AKIRA_NOTIF_CLEARED")
+        registerReceiver(notificationReceiver, notifFilter, RECEIVER_NOT_EXPORTED)
+
+        val batteryFilter = IntentFilter()
+        batteryFilter.addAction(Intent.ACTION_BATTERY_CHANGED)
+        batteryFilter.addAction(Intent.ACTION_POWER_CONNECTED)
+        batteryFilter.addAction(Intent.ACTION_POWER_DISCONNECTED)
+        registerReceiver(batteryReceiver, batteryFilter)
 
         timerOverlay = TimerOverlay(this) 
-        
         floatingView = LayoutInflater.from(this).inflate(R.layout.layout_floating_button, null)
         
         val layoutFlag: Int = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -95,12 +144,11 @@ class FloatingService : Service() {
         setupMenuClicks()
     }
 
-    // Dynamic Color Changer Logic
     private fun setNeonColor(hexColor: String) {
         val drawable = GradientDrawable()
         drawable.shape = GradientDrawable.OVAL
         drawable.setColor(Color.parseColor(hexColor))
-        drawable.setStroke(4, Color.WHITE) // Border thickness
+        drawable.setStroke(4, Color.WHITE) 
         btnMain.background = drawable
         btnMain.setTextColor(Color.BLACK)
     }
@@ -214,7 +262,9 @@ class FloatingService : Service() {
 
         btnSettings.setOnClickListener {
             toggleRadialMenu()
-            Toast.makeText(this, "Settings screen aayegi (Phase 6)", Toast.LENGTH_SHORT).show()
+            val intent = Intent(this, SettingsActivity::class.java)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(intent)
         }
         
         btnClock.setOnClickListener {
@@ -235,8 +285,6 @@ class FloatingService : Service() {
             if (intent != null) {
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 startActivity(intent)
-            } else {
-                Toast.makeText(this, "App found nahi hui!", Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
             Toast.makeText(this, "Error launching app", Toast.LENGTH_SHORT).show()
@@ -257,7 +305,9 @@ class FloatingService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        // App band hone par dono receivers ko safely kill karna
         unregisterReceiver(notificationReceiver)
+        unregisterReceiver(batteryReceiver)
         if (::floatingView.isInitialized) {
             windowManager.removeView(floatingView)
         }

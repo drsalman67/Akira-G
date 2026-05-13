@@ -27,6 +27,11 @@
             android:exported="false"
             android:theme="@style/Theme.AppCompat.DayNight.NoActionBar"/>
 
+        <activity 
+            android:name=".SettingsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AppCompat.DayNight.NoActionBar"/>
+
         <service
             android:name=".service.FloatingService"
             android:enabled="true"
