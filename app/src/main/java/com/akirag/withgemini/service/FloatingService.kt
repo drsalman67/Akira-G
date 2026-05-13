@@ -13,6 +13,8 @@ import android.view.WindowManager
 import android.widget.TextView
 import android.widget.Toast
 import com.akirag.withgemini.R
+import com.akirag.withgemini.apppicker.AppPickerActivity
+import com.akirag.withgemini.utils.Prefs
 import kotlin.math.abs
 
 class FloatingService : Service() {
@@ -21,10 +23,8 @@ class FloatingService : Service() {
     private lateinit var floatingView: View
     private lateinit var params: WindowManager.LayoutParams
 
-    // Menu state
     private var isMenuExpanded = false
 
-    // Buttons
     private lateinit var btnMain: TextView
     private lateinit var btnGemini: TextView
     private lateinit var btnAdd: TextView
@@ -59,7 +59,6 @@ class FloatingService : Service() {
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         windowManager.addView(floatingView, params)
 
-        // Init views
         btnMain = floatingView.findViewById(R.id.btn_floating_icon)
         btnGemini = floatingView.findViewById(R.id.btn_gemini)
         btnAdd = floatingView.findViewById(R.id.btn_add)
@@ -68,6 +67,25 @@ class FloatingService : Service() {
 
         setupDraggingAndClick()
         setupMenuClicks()
+    }
+
+    // Har baar jab menu khulega, ye check karega ki koi app save hui hai ya nahi
+    private fun updateAddButtonIcon() {
+        val savedPackage = Prefs.getSavedAppPackage(this)
+        if (savedPackage != null) {
+            try {
+                val icon = packageManager.getApplicationIcon(savedPackage)
+                btnAdd.background = icon
+                btnAdd.text = "" // Text hata do taake sirf app ka icon dikhe
+            } catch (e: Exception) {
+                // Agar app uninstall ho gayi toh wapas normal ho jao
+                btnAdd.setBackgroundResource(R.drawable.mini_circle_background)
+                btnAdd.text = "+"
+            }
+        } else {
+            btnAdd.setBackgroundResource(R.drawable.mini_circle_background)
+            btnAdd.text = "+"
+        }
     }
 
     private fun setupDraggingAndClick() {
@@ -89,7 +107,6 @@ class FloatingService : Service() {
                         return true
                     }
                     MotionEvent.ACTION_MOVE -> {
-                        // Agar user ne thoda zyada finger move kiya, toh wo click nahi, drag maana jayega
                         if (abs(event.rawX - initialTouchX) > 10 || abs(event.rawY - initialTouchY) > 10) {
                             isDrag = true
                             params.x = initialX + (event.rawX - initialTouchX).toInt()
@@ -99,7 +116,6 @@ class FloatingService : Service() {
                         return true
                     }
                     MotionEvent.ACTION_UP -> {
-                        // Agar drag nahi tha, toh iska matlab user ne click kiya hai!
                         if (!isDrag) {
                             toggleRadialMenu()
                         }
@@ -113,10 +129,9 @@ class FloatingService : Service() {
 
     private fun toggleRadialMenu() {
         val duration = 300L
-        val offset = 180f // Kitna door nikalna hai buttons ko main button se
+        val offset = 180f 
 
         if (isMenuExpanded) {
-            // Collapse Menu (Wapas andar le jao)
             btnGemini.animate().translationX(0f).translationY(0f).setDuration(duration).withEndAction { btnGemini.visibility = View.INVISIBLE }.start()
             btnAdd.animate().translationX(0f).translationY(0f).setDuration(duration).withEndAction { btnAdd.visibility = View.INVISIBLE }.start()
             btnSettings.animate().translationX(0f).translationY(0f).setDuration(duration).withEndAction { btnSettings.visibility = View.INVISIBLE }.start()
@@ -124,35 +139,47 @@ class FloatingService : Service() {
             
             btnMain.text = "G"
         } else {
-            // Expand Menu (Bahar nikalo)
+            updateAddButtonIcon() // Menu khulne se pehle icon update karo
+            
             btnGemini.visibility = View.VISIBLE
             btnAdd.visibility = View.VISIBLE
             btnSettings.visibility = View.VISIBLE
             btnClock.visibility = View.VISIBLE
 
-            // Upar ki taraf (Gemini)
             btnGemini.animate().translationX(0f).translationY(-offset).setDuration(duration).start()
-            // Right ki taraf (Add)
             btnAdd.animate().translationX(offset).translationY(0f).setDuration(duration).start()
-            // Neeche ki taraf (Settings)
             btnSettings.animate().translationX(0f).translationY(offset).setDuration(duration).start()
-            // Left ki taraf (Clock)
             btnClock.animate().translationX(-offset).translationY(0f).setDuration(duration).start()
 
-            btnMain.text = "X" // Menu open hone pe icon change
+            btnMain.text = "X" 
         }
         isMenuExpanded = !isMenuExpanded
     }
 
     private fun setupMenuClicks() {
         btnGemini.setOnClickListener {
-            toggleRadialMenu() // Menu band karo pehle
+            toggleRadialMenu() 
             launchGeminiApp()
         }
+        
+        // Short Click: App Launch karo ya Picker kholo
         btnAdd.setOnClickListener {
             toggleRadialMenu()
-            Toast.makeText(this, "Add App Picker aayega (Phase 3)", Toast.LENGTH_SHORT).show()
+            val savedPackage = Prefs.getSavedAppPackage(this)
+            if (savedPackage != null) {
+                launchSavedApp(savedPackage)
+            } else {
+                openAppPicker()
+            }
         }
+
+        // Long Click: Hamesha App Picker kholo change karne ke liye
+        btnAdd.setOnLongClickListener {
+            toggleRadialMenu()
+            openAppPicker()
+            true
+        }
+
         btnSettings.setOnClickListener {
             toggleRadialMenu()
             Toast.makeText(this, "Settings screen aayegi (Phase 6)", Toast.LENGTH_SHORT).show()
@@ -163,12 +190,32 @@ class FloatingService : Service() {
         }
     }
 
+    private fun openAppPicker() {
+        val intent = Intent(this, AppPickerActivity::class.java)
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        startActivity(intent)
+        Toast.makeText(this, "Select App for Shortcut", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun launchSavedApp(packageName: String) {
+        try {
+            val intent = packageManager.getLaunchIntentForPackage(packageName)
+            if (intent != null) {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                startActivity(intent)
+            } else {
+                Toast.makeText(this, "App found nahi hui!", Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: Exception) {
+            Toast.makeText(this, "Error launching app", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     private fun launchGeminiApp() {
         try {
-            // Intent se direct package call karna
             val intent = packageManager.getLaunchIntentForPackage("com.google.android.apps.bard")
             if (intent != null) {
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) // Service se Activity kholne ke liye zaroori
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 startActivity(intent)
             } else {
                 Toast.makeText(this, "Gemini app install nahi hai bhai!", Toast.LENGTH_LONG).show()
